@@ -1,0 +1,857 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>코흐 눈송이 프랙탈 대화형 시뮬레이터</title>
+  
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  
+  <!-- FontAwesome Icons -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
+  <!-- Google Fonts (Noto Sans KR & Inter) -->
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+KR:wght@300;400;500;700;800;900&family=Inter:wght@400;600;700;800&display=swap">
+
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['Noto Sans KR', 'Inter', 'sans-serif'],
+          },
+          colors: {
+            darkbg: '#090d16',
+            cardbg: 'rgba(15, 23, 42, 0.75)',
+            bordercolor: 'rgba(255, 255, 255, 0.1)',
+            cyan glow: '#38bdf8',
+          }
+        }
+      }
+    }
+  </script>
+
+  <style>
+    /* Glassmorphism styling */
+    .glass-panel {
+      background: rgba(15, 23, 42, 0.75);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    
+    .glass-panel-interactive {
+      background: rgba(30, 41, 59, 0.6);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      transition: all 0.2s ease-in-out;
+    }
+    .glass-panel-interactive:hover {
+      background: rgba(30, 41, 59, 0.85);
+      border-color: rgba(56, 189, 248, 0.4);
+    }
+
+    /* Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #0f172a;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #334155;
+      border-radius: 3px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #475569;
+    }
+
+    /* Range Slider Styling */
+    input[type=range] {
+      -webkit-appearance: none;
+      background: transparent;
+    }
+    input[type=range]:focus {
+      outline: none;
+    }
+    input[type=range]::-webkit-slider-runnable-track {
+      width: 100%;
+      height: 8px;
+      cursor: pointer;
+      background: #1e293b;
+      border-radius: 4px;
+      border: 1px solid rgba(255, 255, 255, 0.1);
+    }
+    input[type=range]::-webkit-slider-thumb {
+      height: 22px;
+      width: 22px;
+      border-radius: 50%;
+      background: #38bdf8;
+      cursor: pointer;
+      -webkit-appearance: none;
+      margin-top: -7px;
+      box-shadow: 0 0 12px rgba(56, 189, 248, 0.8);
+      transition: transform 0.15s ease;
+    }
+    input[type=range]::-webkit-slider-thumb:hover {
+      transform: scale(1.15);
+    }
+
+    /* Presentation Canvas Fullscreen */
+    .presentation-active #sidebar-panel {
+      display: none;
+    }
+    .presentation-active #canvas-container {
+      grid-column: span 12 / span 12;
+      height: calc(100vh - 100px);
+    }
+
+    /* Glowing animations */
+    @keyframes pulse-glow {
+      0%, 100% { opacity: 0.6; filter: drop-shadow(0 0 8px rgba(56, 189, 248, 0.4)); }
+      50% { opacity: 1; filter: drop-shadow(0 0 16px rgba(56, 189, 248, 0.8)); }
+    }
+    .glow-active {
+      animation: pulse-glow 3s infinite ease-in-out;
+    }
+  </style>
+</head>
+<body class="bg-[#090d16] text-slate-100 font-sans min-h-screen flex flex-col overflow-x-hidden selection:bg-sky-500 selection:text-white">
+
+  <!-- TOP HEADER -->
+  <header class="w-full glass-panel border-b border-slate-800/80 px-4 lg:px-8 py-3.5 sticky top-0 z-50 flex items-center justify-between">
+    <div class="flex items-center space-x-3">
+      <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-sky-500 to-cyan-300 flex items-center justify-center text-slate-950 font-black text-xl shadow-lg shadow-sky-500/20">
+        <i class="fa-solid fa-snowflake"></i>
+      </div>
+      <div>
+        <h1 class="text-lg lg:text-xl font-black tracking-tight text-white flex items-center gap-2">
+          코흐 눈송이 <span class="text-sky-400 font-light">프랙탈 시뮬레이터</span>
+        </h1>
+        <p class="text-xs text-slate-400 hidden sm:block">수식 없이 직관으로 파악하는 '무한한 둘레'와 '유한한 넓이'의 기하학적 역설</p>
+      </div>
+    </div>
+
+    <!-- Header Actions -->
+    <div class="flex items-center space-x-2 sm:space-x-3">
+      <!-- Theme Selection Pills -->
+      <div class="hidden md:flex items-center bg-slate-900/80 p-1 rounded-lg border border-slate-800 text-xs font-semibold">
+        <button onclick="setTheme('ice')" id="theme-btn-ice" class="px-2.5 py-1 rounded-md transition-all text-sky-400 bg-slate-800">Ice Blue</button>
+        <button onclick="setTheme('neon')" id="theme-btn-neon" class="px-2.5 py-1 rounded-md transition-all text-slate-400 hover:text-white">Cyber Neon</button>
+        <button onclick="setTheme('gold')" id="theme-btn-gold" class="px-2.5 py-1 rounded-md transition-all text-slate-400 hover:text-white">Gold</button>
+        <button onclick="setTheme('rainbow')" id="theme-btn-rainbow" class="px-2.5 py-1 rounded-md transition-all text-slate-400 hover:text-white">Rainbow</button>
+      </div>
+
+      <!-- Presentation Toggle -->
+      <button id="pres-mode-btn" onclick="togglePresentationMode()" class="px-3 py-1.5 rounded-lg glass-panel-interactive text-xs font-bold text-slate-200 flex items-center gap-1.5">
+        <i class="fa-solid fa-expand text-sky-400"></i>
+        <span class="hidden sm:inline">발표 모드</span>
+      </button>
+
+      <!-- Info Modal Toggle -->
+      <button onclick="toggleInfoModal()" class="w-8 h-8 rounded-lg glass-panel-interactive flex items-center justify-center text-slate-300 hover:text-white text-sm">
+        <i class="fa-solid fa-circle-info"></i>
+      </button>
+    </div>
+  </header>
+
+  <!-- MAIN APP CONTAINER -->
+  <main id="app-viewport" class="flex-grow p-3 sm:p-4 lg:p-6 grid grid-cols-12 gap-4 lg:gap-6 max-w-[1800px] w-full mx-auto">
+    
+    <!-- LEFT / CENTER: CANVAS INTERACTIVE AREA (Cols 12 or 7) -->
+    <section id="canvas-container" class="col-span-12 lg:col-span-7 xl:col-span-8 flex flex-col glass-panel rounded-2xl overflow-hidden relative border border-slate-800 shadow-2xl transition-all duration-300">
+      
+      <!-- Canvas Overlay Controls (Top Bar) -->
+      <div class="absolute top-4 left-4 right-4 z-20 flex flex-wrap items-center justify-between gap-2 pointer-events-none">
+        
+        <!-- Level Badge & Step Indicator -->
+        <div class="pointer-events-auto bg-slate-950/80 backdrop-blur-md px-3.5 py-1.5 rounded-xl border border-slate-800/80 shadow-lg flex items-center space-x-2.5">
+          <span class="w-2.5 h-2.5 rounded-full bg-sky-400 animate-ping"></span>
+          <span class="text-xs font-bold uppercase tracking-wider text-slate-400">단계:</span>
+          <span id="level-indicator-badge" class="text-sm font-black text-sky-400">Level 0 (기본 정삼각형)</span>
+        </div>
+
+        <!-- Canvas Quick Controls -->
+        <div class="pointer-events-auto flex items-center space-x-1.5 bg-slate-950/80 backdrop-blur-md p-1 rounded-xl border border-slate-800/80 shadow-lg">
+          <!-- Bounding Circle Toggle -->
+          <button id="circle-toggle-btn" onclick="toggleOuterCircle()" class="px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition">
+            <i class="fa-regular fa-circle text-amber-400"></i>
+            <span>외접원 (넓이 한계선)</span>
+          </button>
+          
+          <div class="w-px h-4 bg-slate-800 mx-1"></div>
+
+          <!-- Zoom In / Out / Reset -->
+          <button onclick="zoomCanvas(1.2)" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-xs" title="확대">
+            <i class="fa-solid fa-plus"></i>
+          </button>
+          <button onclick="zoomCanvas(0.8)" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-xs" title="축소">
+            <i class="fa-solid fa-minus"></i>
+          </button>
+          <button onclick="resetCanvasTransform()" class="w-7 h-7 rounded-lg hover:bg-slate-800 text-slate-300 flex items-center justify-center text-xs" title="화면 리셋">
+            <i class="fa-solid fa-arrows-rotate"></i>
+          </button>
+        </div>
+      </div>
+
+      <!-- CANVAS ELEMENT -->
+      <div class="relative w-full flex-grow min-h-[420px] lg:min-h-[520px] bg-radial from-slate-900/50 to-slate-950 cursor-grab active:cursor-grabbing overflow-hidden" id="canvas-wrapper">
+        <canvas id="snowflake-canvas" class="w-full h-full block"></canvas>
+
+        <!-- Dynamic Visual Watermark / Instruction Toast -->
+        <div class="absolute bottom-4 left-4 z-10 pointer-events-none text-slate-500 text-xs flex items-center gap-2 bg-slate-950/60 px-3 py-1.5 rounded-lg border border-slate-800/50">
+          <i class="fa-solid fa-hand-pointer text-sky-400 animate-bounce"></i>
+          <span>마우스 드래그로 이동 | 휠 스크롤로 확대/축소 가능</span>
+        </div>
+      </div>
+
+      <!-- Bottom Slider & Play Bar -->
+      <div class="p-4 bg-slate-950/90 border-t border-slate-800/80 flex flex-col sm:flex-row items-center gap-4 z-20">
+        <!-- Auto Play Toggle -->
+        <button id="play-btn" onclick="toggleAutoPlay()" class="w-full sm:w-auto px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/25 transition">
+          <i class="fa-solid fa-play" id="play-icon"></i>
+          <span id="play-text">자동 변화 재생</span>
+        </button>
+
+        <!-- Iteration Level Slider -->
+        <div class="flex-grow w-full flex flex-col gap-1">
+          <div class="flex justify-between items-center text-xs font-bold text-slate-400 px-1">
+            <span>반복 단계 (Iteration Level)</span>
+            <span class="text-sky-400 font-mono text-sm" id="slider-level-text">Level 0</span>
+          </div>
+          <input type="range" id="level-slider" min="0" max="6" step="1" value="0" oninput="changeLevel(parseInt(this.value))">
+        </div>
+
+        <!-- Direct Level Quick Buttons -->
+        <div class="hidden md:flex items-center space-x-1 bg-slate-900 p-1 rounded-xl border border-slate-800">
+          <button onclick="changeLevel(0)" class="lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition bg-sky-500 text-slate-950">0</button>
+          <button onclick="changeLevel(1)" class="lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">1</button>
+          <button onclick="changeLevel(2)" class="lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">2</button>
+          <button onclick="changeLevel(3)" class="lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">3</button>
+          <button onclick="changeLevel(4)" class="lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">4</button>
+          <button onclick="changeLevel(5)" class="lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">5</button>
+          <button onclick="changeLevel(6)" class="lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white">6</button>
+        </div>
+      </div>
+    </section>
+
+    <!-- RIGHT SIDEBAR: VISUAL ANALYTICS & EXPLANATION CARDS (Cols 12 or 5) -->
+    <section id="sidebar-panel" class="col-span-12 lg:col-span-5 xl:col-span-4 flex flex-col space-y-4 lg:space-y-5 overflow-y-auto max-h-[calc(100vh-120px)] pr-1">
+      
+      <!-- CARD 1: INTUITIVE VISUAL ANALYTICS (NO COMPLEX FORMULAS) -->
+      <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col space-y-4 shadow-xl">
+        <div class="flex items-center justify-between border-b border-slate-800 pb-3">
+          <h2 class="text-base font-extrabold text-white flex items-center gap-2">
+            <i class="fa-solid fa-chart-line text-sky-400"></i>
+            직관적 상태 분석 (Visual Analytics)
+          </h2>
+          <span class="text-[11px] font-semibold bg-sky-500/10 text-sky-400 px-2 py-0.5 rounded-full border border-sky-500/20">수식 없는 직관</span>
+        </div>
+
+        <!-- Perimeter (둘레) Growth Bar -->
+        <div class="space-y-1.5">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-slate-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-ruler-horizontal text-sky-400"></i>
+              둘레의 길이 (Perimeter)
+            </span>
+            <span id="perimeter-ratio-text" class="font-extrabold font-mono text-sky-400">100% (기준)</span>
+          </div>
+          <!-- Progress Track -->
+          <div class="w-full h-3.5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800 relative">
+            <div id="perimeter-bar" class="h-full bg-gradient-to-r from-sky-500 to-cyan-300 rounded-full transition-all duration-500 shadow-lg shadow-sky-500/30" style="width: 17.8%"></div>
+          </div>
+          <p id="perimeter-status-desc" class="text-[11px] text-slate-400 text-right font-medium">
+            <i class="fa-solid fa-arrow-trend-up text-sky-400 mr-1"></i>단계가 오를 때마다 1.33배씩 무한히 폭발 증가!
+          </p>
+        </div>
+
+        <!-- Area (넓이) Bounded Convergence Bar -->
+        <div class="space-y-1.5 pt-1">
+          <div class="flex justify-between items-center text-xs">
+            <span class="font-bold text-slate-300 flex items-center gap-1.5">
+              <i class="fa-solid fa-vector-square text-amber-400"></i>
+              내부 넓이 (Area)
+            </span>
+            <span id="area-ratio-text" class="font-extrabold font-mono text-amber-400">62.5% / 한계치 100%</span>
+          </div>
+          <!-- Progress Track -->
+          <div class="w-full h-3.5 bg-slate-900 rounded-full overflow-hidden p-0.5 border border-slate-800 relative">
+            <!-- Bound Marker line at 100% -->
+            <div class="absolute right-0 top-0 bottom-0 w-1 bg-amber-400 z-10" title="외접원 한계선"></div>
+            <div id="area-bar" class="h-full bg-gradient-to-r from-amber-500 to-amber-300 rounded-full transition-all duration-500 shadow-lg shadow-amber-500/20" style="width: 62.5%"></div>
+          </div>
+          <p id="area-status-desc" class="text-[11px] text-slate-400 text-right font-medium">
+            <i class="fa-solid fa-shield-halved text-amber-400 mr-1"></i>외접원 한계선(1.6배)을 절대 넘지 않고 수렴!
+          </p>
+        </div>
+
+        <!-- Dynamic Counter Stats Grid -->
+        <div class="grid grid-cols-2 gap-2.5 pt-2">
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] font-medium text-slate-400 block">바깥 톱니 변의 개수</span>
+            <span id="stat-segment-count" class="text-base font-extrabold font-mono text-slate-100">3 개</span>
+          </div>
+          <div class="bg-slate-900/80 p-3 rounded-xl border border-slate-800">
+            <span class="text-[11px] font-medium text-slate-400 block">한 변의 상대적 길이</span>
+            <span id="stat-segment-length" class="text-base font-extrabold font-mono text-slate-100">1.000 (기준)</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 2: DYNAMIC STEP VISUAL EXPLANATION CARD -->
+      <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col space-y-3.5 shadow-xl relative overflow-hidden">
+        <!-- Glow accent bg -->
+        <div class="absolute -right-10 -bottom-10 w-32 h-32 bg-sky-500/10 rounded-full blur-2xl pointer-events-none"></div>
+
+        <div class="flex items-center space-x-2">
+          <span id="explanation-step-badge" class="px-2.5 py-1 rounded-lg bg-sky-500/20 text-sky-400 border border-sky-500/30 text-xs font-black">
+            Step 0
+          </span>
+          <h3 id="explanation-title" class="text-sm font-bold text-white">
+            시작: 매끈한 정삼각형
+          </h3>
+        </div>
+
+        <p id="explanation-body" class="text-xs sm:text-sm text-slate-300 leading-relaxed">
+          가장 단순하고 완벽한 균형을 이루는 기본 정삼각형입니다. 현재는 구부러진 곳이 없는 3개의 매끄러운 직선 변으로 둘레와 넓이의 기준점 역할을 합니다.
+        </p>
+
+        <!-- Visual Key Takeaway Box -->
+        <div id="explanation-takeaway" class="bg-slate-900/90 p-3 rounded-xl border-l-4 border-sky-400 text-xs text-slate-300 flex items-start gap-2.5">
+          <i class="fa-solid fa-eye text-sky-400 text-base mt-0.5"></i>
+          <div>
+            <strong class="text-sky-300 block font-bold mb-0.5">관전 포인트:</strong>
+            <span id="explanation-takeaway-text">외접원 버튼을 켜보세요! 이 원이 눈송이가 늘어날 수 있는 넓이의 최대 한계선입니다.</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- CARD 3: FRACTAL PARADOX CORE PRINCIPLE -->
+      <div class="glass-panel rounded-2xl p-5 border border-slate-800 flex flex-col space-y-3 shadow-xl">
+        <h3 class="text-sm font-extrabold text-white flex items-center gap-2">
+          <i class="fa-solid fa-brain text-amber-400"></i>
+          프랙탈 역설 한눈에 이해하기
+        </h3>
+
+        <div class="space-y-2 text-xs text-slate-300">
+          <div class="flex items-start gap-2.5 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="w-6 h-6 rounded-lg bg-sky-500/20 text-sky-400 flex items-center justify-center shrink-0 font-bold">1</div>
+            <div>
+              <strong class="text-sky-300 font-bold">왜 둘레는 무한할까?</strong>
+              <p class="text-slate-400 mt-0.5">직선 1개를 지우고 ∧ 모양으로 꺾을 때마다 선의 길이가 계속 1.33배 늘어나기 때문입니다. 실을 풀면 우주 끝까지 늘어납니다.</p>
+            </div>
+          </div>
+
+          <div class="flex items-start gap-2.5 bg-slate-900/60 p-2.5 rounded-xl border border-slate-800/80">
+            <div class="w-6 h-6 rounded-lg bg-amber-500/20 text-amber-400 flex items-center justify-center shrink-0 font-bold">2</div>
+            <div>
+              <strong class="text-amber-300 font-bold">왜 넓이는 유한할까?</strong>
+              <p class="text-slate-400 mt-0.5">새로 솟아나는 뿔의 크기가 급격히 작아지며, 황색 외접원 울타리를 절대로 넘을 수 없기 때문입니다.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+    </section>
+
+  </main>
+
+  <!-- INFO MODAL -->
+  <div id="info-modal" class="fixed inset-0 z-50 bg-slate-950/80 backdrop-blur-md flex items-center justify-center p-4 hidden">
+    <div class="glass-panel max-w-lg w-full rounded-2xl p-6 border border-slate-800 shadow-2xl relative space-y-4">
+      <button onclick="toggleInfoModal()" class="absolute top-4 right-4 text-slate-400 hover:text-white">
+        <i class="fa-solid fa-xmark text-lg"></i>
+      </button>
+
+      <div class="flex items-center space-x-3">
+        <div class="w-10 h-10 rounded-xl bg-sky-500/20 text-sky-400 flex items-center justify-center text-lg font-bold">
+          <i class="fa-solid fa-snowflake"></i>
+        </div>
+        <div>
+          <h3 class="text-base font-bold text-white">시뮬레이터 안내</h3>
+          <p class="text-xs text-slate-400">코흐 눈송이(Koch Snowflake) 탐구 도구</p>
+        </div>
+      </div>
+
+      <div class="text-xs text-slate-300 space-y-2.5 leading-relaxed">
+        <p>
+          이 앱은 스웨덴의 수학자 헬게 본 코흐(Helge von Koch)가 1904년에 고안한 대표적 프랙탈 구조인 **'코흐 눈송이'**를 복잡한 수학 공식 없이 눈으로 직관 탐구하도록 제작되었습니다.
+        </p>
+        <div class="bg-slate-900 p-3 rounded-xl border border-slate-800 space-y-1">
+          <strong class="text-sky-400 block font-bold">주요 기능:</strong>
+          <ul class="list-disc list-inside text-slate-400 space-y-0.5">
+            <li>슬라이더 및 버튼으로 단계별(0~6단계) 눈송이 생성</li>
+            <li>마우스 드래그/휠로 자유로운 화면 이동 및 무한 확대</li>
+            <li>'외접원' 스위치로 넓이가 수렴하는 울타리 한계선 확인</li>
+            <li>발표 모드로 교실 화면 공유 및 대형 디스플레이 시연</li>
+          </ul>
+        </div>
+      </div>
+
+      <div class="pt-2 text-right">
+        <button onclick="toggleInfoModal()" class="px-4 py-2 bg-sky-500 text-slate-950 rounded-xl font-bold text-xs hover:bg-sky-400 transition">
+          확인하고 시작하기
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- JAVASCRIPT LOGIC -->
+  <script>
+    /* ==========================================================================
+       STATE MANAGEMENT & GEOMETRY CACHE
+       ========================================================================== */
+    const state = {
+      level: 0,
+      theme: 'ice', // 'ice', 'neon', 'gold', 'rainbow'
+      showOuterCircle: true,
+      isPlaying: false,
+      playInterval: null,
+      isPresentationMode: false,
+      
+      // Canvas Transform
+      scale: 1,
+      panX: 0,
+      panY: 0,
+      isDragging: false,
+      dragStart: { x: 0, y: 0 }
+    };
+
+    // Cached Snowflake points for Levels 0 to 6
+    const geometryCache = {};
+
+    // Theme Color Mapping
+    const themes = {
+      ice: {
+        stroke: '#38bdf8',
+        fill: 'rgba(56, 189, 248, 0.12)',
+        glow: '#0284c7',
+        circle: '#fbbf24'
+      },
+      neon: {
+        stroke: '#f43f5e',
+        fill: 'rgba(244, 63, 94, 0.15)',
+        glow: '#a855f7',
+        circle: '#22c55e'
+      },
+      gold: {
+        stroke: '#fbbf24',
+        fill: 'rgba(251, 191, 36, 0.15)',
+        glow: '#d97706',
+        circle: '#38bdf8'
+      },
+      rainbow: {
+        stroke: '#38bdf8', // dynamic multi-stroke in loop
+        fill: 'rgba(255, 255, 255, 0.08)',
+        glow: '#ec4899',
+        circle: '#fbbf24'
+      }
+    };
+
+    // Step Explanations Data
+    const stepExplanations = [
+      {
+        badge: "Step 0",
+        title: "시작: 매끈한 정삼각형",
+        body: "가장 단순하고 완벽한 균형을 이루는 기본 정삼각형입니다. 현재는 구부러진 곳이 없는 3개의 매끄러운 직선 변으로 둘레와 넓이의 기준점 역할을 합니다.",
+        takeaway: "외접원 버튼을 켜보세요! 이 황색 원이 눈송이가 아무리 커져도 넘을 수 없는 넓이의 최대 한계선입니다."
+      },
+      {
+        badge: "Step 1",
+        title: "3개의 뾰족한 뿔 생성",
+        body: "각 변의 가운데 1/3을 지우고 뾰족한 뿔(정삼각형) 3개를 새로 달았습니다. 직선이 꺾이면서 둘레의 길이가 기존보다 정확히 1.33배 길어졌습니다.",
+        takeaway: "테두리 변의 개수가 3개에서 12개로 늘어났습니다."
+      },
+      {
+        badge: "Step 2",
+        title: "12개의 뿔로 분열 시작",
+        body: "새로 생긴 모든 변마다 작은 뿔이 추가되며 총 12개의 뾰족한 가시가 솟아났습니다. 눈송이 특유의 테두리 윤곽이 뚜렷해지기 시작합니다.",
+        takeaway: "둘레는 계속 길어지지만, 새로 생기는 뿔의 크기가 1/3로 대폭 줄어들었습니다."
+      },
+      {
+        badge: "Step 3",
+        title: "48개의 미세한 톱니 형성",
+        body: "이제 톱니의 개수가 48개로 늘었습니다. 멀리서 보면 진짜 결정체 눈송이처럼 보이지만, 확대해보면 여전히 아주 작은 뾰족한 변들이 돋아나 있습니다.",
+        takeaway: "넓이 그래프를 보세요! 뿔이 계속 추가되어도 외접원 울타리(1.6배) 근처에서 거의 증가하지 않습니다."
+      },
+      {
+        badge: "Step 4",
+        title: "복잡한 프랙탈 자취 (192개 변)",
+        body: "변의 개수가 192개에 달합니다. 손으로 그리기 불가능할 만큼 정교한 구불구불한 테두리가 완성되었습니다.",
+        takeaway: "둘레의 길이는 초기 삼각형의 3배를 넘어 계속 길어지고 있습니다."
+      },
+      {
+        badge: "Step 5",
+        title: "무한으로 향하는 테두리 (768개 변)",
+        body: "768개의 아주 미세한 변으로 이루어져 있습니다. 이제 눈송이 테두리를 실로 풀어서 잰다면 어마어마한 길이가 됩니다.",
+        takeaway: "둘레는 4배 이상으로 폭발하지만, 넓이는 99.3%로 상한선에 완전히 바짝 붙어있습니다."
+      },
+      {
+        badge: "Step 6",
+        title: "무한 둘레 & 유한 넓이의 완성 (3,072개 변)",
+        body: "3,072개의 미세 톱니로 구성되었습니다! 테두리는 한없이 복잡해져 무한대의 길이를 향해 가지만, 내부 전체 면적은 처음에 그린 황색 외접원 상자 안에 완전히 갇혀 있습니다.",
+        takeaway: "이것이 바로 프랙탈 기하학의 정수: '유한한 공간(넓이) 속 무한한 경계선(둘레)'입니다!"
+      }
+    ];
+
+    /* ==========================================================================
+       CANVAS & KOCH GEOMETRY ALGORITHM
+       ========================================================================== */
+    const canvas = document.getElementById('snowflake-canvas');
+    const ctx = canvas.getContext('2d');
+    const wrapper = document.getElementById('canvas-wrapper');
+
+    // Generate Koch Snowflake Points for Level N
+    function generateKochPoints(level) {
+      if (geometryCache[level]) return geometryCache[level];
+
+      // Base Equilateral Triangle Vertices (Normalized radius = 1)
+      const r = 1;
+      let points = [
+        { x: r * Math.cos(-Math.PI / 2), y: r * Math.sin(-Math.PI / 2) },
+        { x: r * Math.cos(-Math.PI / 2 + (2 * Math.PI) / 3), y: r * Math.sin(-Math.PI / 2 + (2 * Math.PI) / 3) },
+        { x: r * Math.cos(-Math.PI / 2 + (4 * Math.PI) / 3), y: r * Math.sin(-Math.PI / 2 + (4 * Math.PI) / 3) },
+        { x: r * Math.cos(-Math.PI / 2), y: r * Math.sin(-Math.PI / 2) } // Closed loop
+      ];
+
+      for (let l = 0; l < level; l++) {
+        const next = [];
+        for (let i = 0; i < points.length - 1; i++) {
+          const p1 = points[i];
+          const p5 = points[i + 1];
+
+          const dx = p5.x - p1.x;
+          const dy = p5.y - p1.y;
+
+          // 1/3 and 2/3 points
+          const p2 = { x: p1.x + dx / 3, y: p1.y + dy / 3 };
+          const p4 = { x: p1.x + (dx * 2) / 3, y: p1.y + (dy * 2) / 3 };
+
+          // Peak point (Rotate vector p2->p4 by -60 deg)
+          const vx = p4.x - p2.x;
+          const vy = p4.y - p2.y;
+          const angle = -Math.PI / 3;
+
+          const p3 = {
+            x: p2.x + vx * Math.cos(angle) - vy * Math.sin(angle),
+            y: p2.y + vx * Math.sin(angle) + vy * Math.cos(angle)
+          };
+
+          next.push(p1, p2, p3, p4);
+        }
+        next.push(points[points.length - 1]);
+        points = next;
+      }
+
+      geometryCache[level] = points;
+      return points;
+    }
+
+    // Resize Canvas Handler
+    function resizeCanvas() {
+      const rect = wrapper.getBoundingClientRect();
+      const dpr = window.devicePixelRatio || 1;
+      
+      canvas.width = rect.width * dpr;
+      canvas.height = rect.height * dpr;
+      
+      ctx.scale(dpr, dpr);
+      render();
+    }
+
+    /* ==========================================================================
+       RENDER LOOP
+       ========================================================================== */
+    function render() {
+      const rect = wrapper.getBoundingClientRect();
+      const width = rect.width;
+      const height = rect.height;
+
+      // Clear Canvas
+      ctx.clearRect(0, 0, width, height);
+
+      ctx.save();
+
+      // Apply Center Pan & Zoom Scale
+      const centerX = width / 2 + state.panX;
+      const centerY = height / 2 + state.panY + 20; // slight downward offset for balance
+      const baseRadius = Math.min(width, height) * 0.38 * state.scale;
+
+      ctx.translate(centerX, centerY);
+
+      const theme = themes[state.theme];
+
+      // 1. Draw Bounding Outer Circle (외접원) if Enabled
+      if (state.showOuterCircle) {
+        ctx.beginPath();
+        ctx.arc(0, 0, baseRadius, 0, Math.PI * 2);
+        ctx.strokeStyle = theme.circle;
+        ctx.lineWidth = 1.8;
+        ctx.setLineDash([6, 6]);
+        ctx.stroke();
+        ctx.setLineDash([]);
+
+        // Label for Outer Circle
+        ctx.fillStyle = theme.circle;
+        ctx.font = 'bold 11px Noto Sans KR';
+        ctx.textAlign = 'center';
+        ctx.fillText('외접원 (넓이의 절대 한계선)', 0, -baseRadius - 10);
+      }
+
+      // 2. Fetch Snowflake Points for Current Level
+      const rawPoints = generateKochPoints(state.level);
+
+      // 3. Draw Snowflake Path
+      ctx.beginPath();
+      rawPoints.forEach((pt, idx) => {
+        const px = pt.x * baseRadius;
+        const py = pt.y * baseRadius;
+        if (idx === 0) ctx.moveTo(px, py);
+        else ctx.lineTo(px, py);
+      });
+      ctx.closePath();
+
+      // Fill Background
+      ctx.fillStyle = theme.fill;
+      ctx.fill();
+
+      // Glow & Stroke Style
+      ctx.shadowColor = theme.glow;
+      ctx.shadowBlur = state.level > 2 ? 12 : 6;
+      ctx.strokeStyle = theme.stroke;
+      ctx.lineWidth = Math.max(1, 2.5 - state.level * 0.25);
+
+      // Special Rainbow Stroke
+      if (state.theme === 'rainbow') {
+        const grad = ctx.createConicGradient(0, 0, 0);
+        grad.addColorStop(0, '#38bdf8');
+        grad.addColorStop(0.25, '#f43f5e');
+        grad.addColorStop(0.5, '#22c55e');
+        grad.addColorStop(0.75, '#fbbf24');
+        grad.addColorStop(1, '#38bdf8');
+        ctx.strokeStyle = grad;
+      }
+
+      ctx.stroke();
+      ctx.restore();
+    }
+
+    /* ==========================================================================
+       UI & ANALYTICS UPDATER
+       ========================================================================== */
+    function updateUI() {
+      const lvl = state.level;
+
+      // Update Slider & Text
+      document.getElementById('level-slider').value = lvl;
+      document.getElementById('slider-level-text').innerText = `Level ${lvl}`;
+      
+      const badgeText = lvl === 0 ? 'Level 0 (기본 정삼각형)' : `Level ${lvl} (눈송이 단계)`;
+      document.getElementById('level-indicator-badge').innerText = badgeText;
+
+      // Quick Buttons Active State
+      document.querySelectorAll('.lvl-btn').forEach((btn, idx) => {
+        if (idx === lvl) {
+          btn.className = 'lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition bg-sky-500 text-slate-950 shadow-md shadow-sky-500/30';
+        } else {
+          btn.className = 'lvl-btn w-7 h-7 rounded-lg text-xs font-bold transition text-slate-400 hover:text-white';
+        }
+      });
+
+      // 1. Calculate Segment & Length Stats
+      const numSegments = 3 * Math.pow(4, lvl);
+      const segmentLenRatio = Math.pow(1 / 3, lvl);
+
+      document.getElementById('stat-segment-count').innerText = `${numSegments.toLocaleString()} 개`;
+      document.getElementById('stat-segment-length').innerText = lvl === 0 ? '1.000 (기준)' : `1 / ${Math.pow(3, lvl).toLocaleString()}`;
+
+      // 2. Calculate Perimeter Growth Ratio: P_n / P_0 = (4/3)^n
+      const perimeterRatio = Math.pow(4 / 3, lvl);
+      const perimeterPercentage = Math.round(perimeterRatio * 100);
+
+      // Visual progress bar scale (Level 0 = 17.8%, Level 6 = 100%)
+      const perimeterBarWidth = Math.min(100, 17.8 + (lvl / 6) * 82.2);
+      document.getElementById('perimeter-bar').style.width = `${perimeterBarWidth}%`;
+      document.getElementById('perimeter-ratio-text').innerText = `${perimeterPercentage}% (${lvl === 6 ? '무한대 수렴' : '폭발적 증가'})`;
+
+      // 3. Calculate Area Convergence Ratio: A_n / A_max (where A_max = 1.6 * A_0)
+      // Area formula: A_n = A_0 * (1 + 3/5 * (1 - (4/9)^n))
+      const areaRatioOfMax = (1 + (3 / 5) * (1 - Math.pow(4 / 9, lvl))) / 1.6;
+      const areaPercentage = (areaRatioOfMax * 100).toFixed(1);
+
+      document.getElementById('area-bar').style.width = `${areaPercentage}%`;
+      document.getElementById('area-ratio-text').innerText = `${areaPercentage}% / 한계치 100%`;
+
+      // 4. Update Explanation Cards
+      const exp = stepExplanations[lvl];
+      document.getElementById('explanation-step-badge').innerText = exp.badge;
+      document.getElementById('explanation-title').innerText = exp.title;
+      document.getElementById('explanation-body').innerText = exp.body;
+      document.getElementById('explanation-takeaway-text').innerText = exp.takeaway;
+
+      render();
+    }
+
+    /* ==========================================================================
+       INTERACTIVE CONTROLS & EVENT LISTENERS
+       ========================================================================== */
+    function changeLevel(newLvl) {
+      state.level = Math.max(0, Math.min(6, newLvl));
+      updateUI();
+    }
+
+    function toggleOuterCircle() {
+      state.showOuterCircle = !state.showOuterCircle;
+      const btn = document.getElementById('circle-toggle-btn');
+      if (state.showOuterCircle) {
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-amber-500/20 text-amber-300 border border-amber-500/30 hover:bg-amber-500/30 transition';
+      } else {
+        btn.className = 'px-2.5 py-1.5 rounded-lg text-xs font-bold flex items-center gap-1.5 bg-slate-800 text-slate-400 border border-slate-700 hover:text-white transition';
+      }
+      render();
+    }
+
+    function setTheme(themeKey) {
+      state.theme = themeKey;
+      ['ice', 'neon', 'gold', 'rainbow'].forEach(t => {
+        const btn = document.getElementById(`theme-btn-${t}`);
+        if (t === themeKey) {
+          btn.className = 'px-2.5 py-1.5 rounded-md transition-all text-sky-400 bg-slate-800 font-bold';
+        } else {
+          btn.className = 'px-2.5 py-1.5 rounded-md transition-all text-slate-400 hover:text-white';
+        }
+      });
+      render();
+    }
+
+    function zoomCanvas(factor) {
+      state.scale = Math.max(0.4, Math.min(12, state.scale * factor));
+      render();
+    }
+
+    function resetCanvasTransform() {
+      state.scale = 1;
+      state.panX = 0;
+      state.panY = 0;
+      render();
+    }
+
+    function toggleAutoPlay() {
+      state.isPlaying = !state.isPlaying;
+      const icon = document.getElementById('play-icon');
+      const text = document.getElementById('play-text');
+      const btn = document.getElementById('play-btn');
+
+      if (state.isPlaying) {
+        icon.className = 'fa-solid fa-pause';
+        text.innerText = '일시 정지';
+        btn.className = 'w-full sm:w-auto px-4 py-2 rounded-xl bg-amber-500 hover:bg-amber-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-amber-500/25 transition';
+
+        state.playInterval = setInterval(() => {
+          let nextLevel = (state.level + 1) % 7;
+          changeLevel(nextLevel);
+        }, 1800);
+      } else {
+        icon.className = 'fa-solid fa-play';
+        text.innerText = '자동 변화 재생';
+        btn.className = 'w-full sm:w-auto px-4 py-2 rounded-xl bg-sky-500 hover:bg-sky-400 text-slate-950 font-extrabold text-sm flex items-center justify-center gap-2 shadow-lg shadow-sky-500/25 transition';
+        clearInterval(state.playInterval);
+      }
+    }
+
+    function togglePresentationMode() {
+      state.isPresentationMode = !state.isPresentationMode;
+      document.body.classList.toggle('presentation-active', state.isPresentationMode);
+      
+      const btn = document.getElementById('pres-mode-btn');
+      if (state.isPresentationMode) {
+        btn.innerHTML = `<i class="fa-solid fa-compress text-amber-400"></i><span class="hidden sm:inline">일반 모드</span>`;
+      } else {
+        btn.innerHTML = `<i class="fa-solid fa-expand text-sky-400"></i><span class="hidden sm:inline">발표 모드</span>`;
+      }
+
+      setTimeout(() => {
+        resizeCanvas();
+        resetCanvasTransform();
+      }, 100);
+    }
+
+    function toggleInfoModal() {
+      const modal = document.getElementById('info-modal');
+      modal.classList.toggle('hidden');
+    }
+
+    /* ==========================================================================
+       CANVAS PANNING & ZOOMING EVENT LISTENERS
+       ========================================================================== */
+    wrapper.addEventListener('mousedown', (e) => {
+      state.isDragging = true;
+      state.dragStart = { x: e.clientX - state.panX, y: e.clientY - state.panY };
+    });
+
+    window.addEventListener('mousemove', (e) => {
+      if (!state.isDragging) return;
+      state.panX = e.clientX - state.dragStart.x;
+      state.panY = e.clientY - state.dragStart.y;
+      render();
+    });
+
+    window.addEventListener('mouseup', () => {
+      state.isDragging = false;
+    });
+
+    wrapper.addEventListener('wheel', (e) => {
+      e.preventDefault();
+      const zoomFactor = e.deltaY < 0 ? 1.1 : 0.9;
+      zoomCanvas(zoomFactor);
+    }, { passive: false });
+
+    // Touch support for mobile devices
+    let touchStartDist = 0;
+    wrapper.addEventListener('touchstart', (e) => {
+      if (e.touches.length === 1) {
+        state.isDragging = true;
+        state.dragStart = { x: e.touches[0].clientX - state.panX, y: e.touches[0].clientY - state.panY };
+      } else if (e.touches.length === 2) {
+        touchStartDist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+      }
+    });
+
+    wrapper.addEventListener('touchmove', (e) => {
+      if (e.touches.length === 1 && state.isDragging) {
+        state.panX = e.touches[0].clientX - state.dragStart.x;
+        state.panY = e.touches[0].clientY - state.dragStart.y;
+        render();
+      } else if (e.touches.length === 2) {
+        const dist = Math.hypot(
+          e.touches[0].clientX - e.touches[1].clientX,
+          e.touches[0].clientY - e.touches[1].clientY
+        );
+        const factor = dist / touchStartDist;
+        zoomCanvas(factor > 1 ? 1.03 : 0.97);
+        touchStartDist = dist;
+      }
+    });
+
+    wrapper.addEventListener('touchend', () => {
+      state.isDragging = false;
+    });
+
+    /* ==========================================================================
+       INITIALIZATION
+       ========================================================================== */
+    window.addEventListener('resize', resizeCanvas);
+
+    window.onload = () => {
+      resizeCanvas();
+      updateUI();
+    };
+  </script>
+</body>
+</html>
